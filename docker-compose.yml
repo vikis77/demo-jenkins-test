@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  springboot-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: springboot-demo-916:latest
+    container_name: springboot-demo-916
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+    volumes:
+      - app-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - demo-network
+
+networks:
+  demo-network:
+    driver: bridge
+
+volumes:
+  app-logs:
