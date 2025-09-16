@@ -35,7 +35,14 @@ pipeline {
             }
             post {
                 always {
-                    publishTestResults testResultsPattern: 'target/surefire-reports/*.xml'
+                    // 使用正确的Jenkins测试报告发布方法
+                    script {
+                        if (fileExists('target/surefire-reports/*.xml')) {
+                            junit 'target/surefire-reports/*.xml'
+                        } else {
+                            echo 'No test reports found'
+                        }
+                    }
                 }
             }
         }
