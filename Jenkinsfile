@@ -9,7 +9,7 @@ pipeline {
     environment {
         APP_NAME = 'springboot-demo-916'
         JAR_FILE = "target/${APP_NAME}.jar"
-        DEPLOY_DIR = '/opt/apps/springboot-demo-916'  // Linux部署目录
+        DEPLOY_DIR = "${WORKSPACE}/deploy"  // 使用workspace目录避免权限问题
         WINDOWS_DEPLOY_DIR = 'C:\\apps\\springboot-demo-916'  // Windows部署目录
     }
 
@@ -37,10 +37,10 @@ pipeline {
                 always {
                     // 使用正确的Jenkins测试报告发布方法
                     script {
-                        if (fileExists('target/surefire-reports/*.xml')) {
-                            junit 'target/surefire-reports/*.xml'
+                        if (fileExists('target/surefire-reports')) {
+                            junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
                         } else {
-                            echo 'No test reports found'
+                            echo 'No surefire-reports directory found'
                         }
                     }
                 }
@@ -65,7 +65,7 @@ pipeline {
                             pkill -f "${APP_NAME}.jar" || true
                             sleep 3
 
-                            echo "Creating deploy directory..."
+                            echo "Creating deploy directory in workspace..."
                             mkdir -p ${DEPLOY_DIR}
 
                             echo "Copying JAR file..."
@@ -80,8 +80,11 @@ pipeline {
                             if pgrep -f "${APP_NAME}.jar"; then
                                 echo "✅ Application is running successfully!"
                                 echo "PID: $(pgrep -f ${APP_NAME}.jar)"
+                                echo "Deploy Directory: ${DEPLOY_DIR}"
+                                echo "Log File: ${DEPLOY_DIR}/app.log"
                             else
                                 echo "❌ Application failed to start!"
+                                echo "Check log file: ${DEPLOY_DIR}/app.log"
                                 exit 1
                             fi
                         '''
