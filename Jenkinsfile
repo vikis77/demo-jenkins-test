@@ -84,10 +84,21 @@ pipeline {
                             echo "========== Starting application =========="
                             cd ${DEPLOY_DIR}
 
-                            # 启动应用并保存PID
-                            nohup java -jar ${APP_NAME}.jar > app.log 2>&1 &
+                            # 创建启动脚本
+                            cat > start-app.sh << 'EOF'
+#!/bin/bash
+cd /var/jenkins_home/workspace/demo1/deploy
+exec java -jar springboot-demo-916.jar > app.log 2>&1
+EOF
+                            chmod +x start-app.sh
+
+                            # 使用setsid完全分离进程
+                            BUILD_ID=dontKillMe setsid ./start-app.sh &
                             APP_PID=$!
                             echo "Started application with PID: ${APP_PID}"
+
+                            # 确保进程独立运行
+                            disown $APP_PID
 
                             # 等待应用启动
                             echo "Waiting for application to start..."
@@ -182,7 +193,7 @@ pipeline {
         }
         success {
             echo '🎉 ========== Build, Deploy and Start Success =========='
-            echo 'Application URL: http://localhost:8080'
+            echo 'Application URL: http://localhost:8081'
             echo 'Check logs in deployment directory for runtime information.'
         }
         failure {
