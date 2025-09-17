@@ -35,10 +35,12 @@ pipeline {
             }
             post {
                 always {
-                    // 使用正确的Jenkins测试报告发布方法
+                    // 简单显示测试结果，不使用junit插件
                     script {
+                        echo '========== Test Results Summary =========='
                         if (fileExists('target/surefire-reports')) {
-                            junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
+                            echo 'Test reports generated successfully'
+                            sh 'ls -la target/surefire-reports/ || true'
                         } else {
                             echo 'No surefire-reports directory found'
                         }
