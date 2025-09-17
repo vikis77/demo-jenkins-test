@@ -62,31 +62,44 @@ pipeline {
                 script {
                     if (isUnix()) {
                         // Linux/Unix 部署
-                        sh '''
-                            echo "Stopping existing application..."
-                            pkill -f "${APP_NAME}.jar" || true
+                        sh '''#!/bin/bash
+                            echo "========== Stopping existing application =========="
+                            pkill -f "${APP_NAME}.jar" || echo "No existing process found"
                             sleep 3
 
-                            echo "Creating deploy directory in workspace..."
+                            echo "========== Creating deploy directory =========="
                             mkdir -p ${DEPLOY_DIR}
+                            echo "Deploy directory: ${DEPLOY_DIR}"
 
-                            echo "Copying JAR file..."
+                            echo "========== Copying JAR file =========="
                             cp ${JAR_FILE} ${DEPLOY_DIR}/
+                            ls -la ${DEPLOY_DIR}/
 
-                            echo "Starting application..."
+                            echo "========== Starting application =========="
                             cd ${DEPLOY_DIR}
-                            nohup java -jar ${APP_NAME}.jar > app.log 2>&1 &
-                            sleep 5
 
-                            echo "Application started. Checking status..."
-                            if pgrep -f "${APP_NAME}.jar"; then
+                            # 启动应用并保存PID
+                            nohup java -jar ${APP_NAME}.jar > app.log 2>&1 &
+                            APP_PID=$!
+                            echo "Started application with PID: ${APP_PID}"
+
+                            # 等待应用启动
+                            echo "Waiting for application to start..."
+                            sleep 8
+
+                            # 检查进程是否运行
+                            if ps -p ${APP_PID} > /dev/null; then
                                 echo "✅ Application is running successfully!"
-                                echo "PID: $(pgrep -f ${APP_NAME}.jar)"
+                                echo "PID: ${APP_PID}"
                                 echo "Deploy Directory: ${DEPLOY_DIR}"
                                 echo "Log File: ${DEPLOY_DIR}/app.log"
+                                echo ""
+                                echo "========== Application Log (last 20 lines) =========="
+                                tail -n 20 ${DEPLOY_DIR}/app.log || echo "Log file not ready yet"
                             else
                                 echo "❌ Application failed to start!"
-                                echo "Check log file: ${DEPLOY_DIR}/app.log"
+                                echo "========== Error Log =========="
+                                cat ${DEPLOY_DIR}/app.log || echo "No log file found"
                                 exit 1
                             fi
                         '''
@@ -118,36 +131,37 @@ pipeline {
             steps {
                 echo '========== Health Check =========='
                 script {
-                    def healthCheckScript = isUnix() ?
-                        '''
-                        for i in {1..30}; do
-                            if curl -s http://localhost:8080 > /dev/null 2>&1; then
-                                echo "✅ Application is healthy and responding!"
-                                exit 0
-                            fi
-                            echo "Waiting for application to start... ($i/30)"
-                            sleep 2
-                        done
-                        echo "⚠️ Health check timeout, but application may still be starting..."
-                        ''' :
-                        '''
-                        for /L %%i in (1,1,15) do (
-                            curl -s http://localhost:8080 >nul 2>&1
-                            if errorlevel 0 (
-                                echo ✅ Application is healthy and responding!
-                                goto :healthy
-                            )
-                            echo Waiting for application to start... (%%i/15^)
-                            timeout 2 >nul
-                        )
-                        echo ⚠️ Health check timeout, but application may still be starting...
-                        :healthy
-                        '''
-
                     if (isUnix()) {
-                        sh healthCheckScript
+                        sh '''#!/bin/bash
+                            # 简单的进程检查，不依赖curl
+                            echo "Checking if application is running..."
+
+                            for i in {1..10}; do
+                                if pgrep -f "${APP_NAME}.jar" > /dev/null; then
+                                    echo "✅ Application process is running!"
+                                    echo "PID: $(pgrep -f ${APP_NAME}.jar)"
+
+                                    # 检查日志是否有启动成功标志
+                                    if grep -q "APPLICATION IS READY" ${DEPLOY_DIR}/app.log 2>/dev/null; then
+                                        echo "✅ Application started successfully!"
+                                        echo ""
+                                        echo "========== Startup Log =========="
+                                        grep -A2 -B2 "APPLICATION IS READY" ${DEPLOY_DIR}/app.log
+                                        exit 0
+                                    fi
+                                fi
+                                echo "Waiting for application to be ready... ($i/10)"
+                                sleep 2
+                            done
+
+                            echo "⚠️ Application may still be starting, check logs at: ${DEPLOY_DIR}/app.log"
+                        '''
                     } else {
-                        bat healthCheckScript
+                        bat '''
+                            echo Health check on Windows...
+                            timeout 5 >nul
+                            echo Application should be running on http://localhost:8080
+                        '''
                     }
                 }
             }
