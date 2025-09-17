@@ -84,21 +84,31 @@ pipeline {
                             echo "========== Starting application =========="
                             cd ${DEPLOY_DIR}
 
-                            # 创建启动脚本
-                            cat > start-app.sh << 'EOF'
+                            # 创建daemon启动脚本
+                            cat > start-daemon.sh << 'EOF'
 #!/bin/bash
 cd /var/jenkins_home/workspace/demo1/deploy
-exec java -jar springboot-demo-916.jar > app.log 2>&1
+
+# 杀死旧进程
+pkill -f springboot-demo-916.jar || true
+sleep 2
+
+# 启动新进程，完全脱离Jenkins会话
+nohup setsid java -jar springboot-demo-916.jar > app.log 2>&1 < /dev/null &
+echo $! > app.pid
+echo "Application started with PID: $(cat app.pid)"
 EOF
-                            chmod +x start-app.sh
+                            chmod +x start-daemon.sh
 
-                            # 使用setsid完全分离进程
-                            BUILD_ID=dontKillMe setsid ./start-app.sh &
-                            APP_PID=$!
-                            echo "Started application with PID: ${APP_PID}"
+                            # 使用JENKINS_NODE_COOKIE绕过进程清理
+                            JENKINS_NODE_COOKIE=dontKillMe ./start-daemon.sh
 
-                            # 确保进程独立运行
-                            disown $APP_PID
+                            # 等待确保启动
+                            sleep 3
+                            if [ -f app.pid ]; then
+                                APP_PID=$(cat app.pid)
+                                echo "Application PID saved: ${APP_PID}"
+                            fi
 
                             # 等待应用启动
                             echo "Waiting for application to start..."
