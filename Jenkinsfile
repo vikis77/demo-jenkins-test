@@ -24,14 +24,20 @@ pipeline {
         stage('Build') {
             steps {
                 echo '========== Building Application =========='
-                sh 'mvn clean package -DskipTests=true'
+                // 使用Jenkins管理的Maven settings配置
+                configFileProvider([configFile(fileId: 'aliyun-maven-settings', variable: 'MAVEN_SETTINGS')]) {
+                    sh 'mvn -s $MAVEN_SETTINGS clean package -DskipTests=true'
+                }
             }
         }
 
         stage('Test') {
             steps {
                 echo '========== Running Tests =========='
-                sh 'mvn test'
+                // 使用Jenkins管理的Maven settings配置
+                configFileProvider([configFile(fileId: 'aliyun-maven-settings', variable: 'MAVEN_SETTINGS')]) {
+                    sh 'mvn -s $MAVEN_SETTINGS test'
+                }
             }
             post {
                 always {
