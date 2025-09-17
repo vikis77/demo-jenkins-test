@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven-3.9.0'    // 根据你的Jenkins配置调整
-        jdk 'JDK-17'           // 根据你的Jenkins配置调整
+        maven 'Maven-3.9.0'
+        jdk 'JDK-17'
     }
 
     environment {
